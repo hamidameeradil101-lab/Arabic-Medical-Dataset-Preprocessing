@@ -1,0 +1,10 @@
+numpy
+pandas
+openpyxl
+nltk
+pyarabic
+transformers
+matplotlib
+pillow
+tabulate
+jupyter
