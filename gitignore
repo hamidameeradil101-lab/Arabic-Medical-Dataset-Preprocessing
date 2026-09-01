@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Dataset files
+*.csv
+*.xlsx
+*.xls
+*.parquet
+
+# Generated outputs
+outputs/
+cleaned_subsets/
+
+# Model files
+*.bin
+*.pt
+*.pth
+*.safetensors
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
