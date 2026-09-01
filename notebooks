@@ -1,1 +1,1552 @@
 
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "128c0077",
+   "metadata": {
+    "papermill": {
+     "duration": 0.010069,
+     "end_time": "2025-07-04T22:18:17.527481",
+     "exception": false,
+     "start_time": "2025-07-04T22:18:17.517412",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "####     Arabic healthcare dataset is a large text dataset consisting of more than 808K questions and answers across 90 variant categories. It makes a great input for different Arabic NLP textual tasks. The dataset is scraped from “Altibbi”[8] medical website and is public and free to use."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c15c3b43",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006666,
+     "end_time": "2025-07-04T22:18:17.540874",
+     "exception": false,
+     "start_time": "2025-07-04T22:18:17.534208",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Libraries"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "35800335",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:18:17.554762Z",
+     "iopub.status.busy": "2025-07-04T22:18:17.554268Z",
+     "iopub.status.idle": "2025-07-04T22:18:27.819069Z",
+     "shell.execute_reply": "2025-07-04T22:18:27.817677Z"
+    },
+    "papermill": {
+     "duration": 10.274485,
+     "end_time": "2025-07-04T22:18:27.821457",
+     "exception": false,
+     "start_time": "2025-07-04T22:18:17.546972",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import re\n",
+    "from transformers import GPT2Tokenizer\n",
+    "from nltk.tokenize import word_tokenize\n",
+    "from pyarabic.araby import strip_diacritics, strip_tatweel"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "c71eb150",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:18:27.837138Z",
+     "iopub.status.busy": "2025-07-04T22:18:27.836392Z",
+     "iopub.status.idle": "2025-07-04T22:20:06.407841Z",
+     "shell.execute_reply": "2025-07-04T22:20:06.405925Z"
+    },
+    "papermill": {
+     "duration": 98.582043,
+     "end_time": "2025-07-04T22:20:06.410526",
+     "exception": false,
+     "start_time": "2025-07-04T22:18:27.828483",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "df = pd.read_excel('/kaggle/input/ahd-arabic-healthcare-dataset/AHD.xlsx')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "fe5f8e1e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:06.426568Z",
+     "iopub.status.busy": "2025-07-04T22:20:06.425785Z",
+     "iopub.status.idle": "2025-07-04T22:20:06.695777Z",
+     "shell.execute_reply": "2025-07-04T22:20:06.694311Z"
+    },
+    "papermill": {
+     "duration": 0.280473,
+     "end_time": "2025-07-04T22:20:06.698060",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.417587",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Question</th>\n",
+       "      <th>Answer</th>\n",
+       "      <th>Category</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>اجريت صورة رنين مغناطيسي للثدي ظهر منطقة تعزيز...</td>\n",
+       "      <td>المهم بالموضوع ما هي درجة ال BIRADS الموصوفة ل...</td>\n",
+       "      <td>جراحة عامة</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>انا اعاني من اشياء تجبرني على فعل امور لا اريد...</td>\n",
+       "      <td>الف سلامه عليك ، انت في حاجه الي معالج نفسي لم...</td>\n",
+       "      <td>أمراض نفسية</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>أريد الاستفسار عن مضاعفات عملية استئصال ورم ال...</td>\n",
+       "      <td>كغيرها من العمليات الجراحية ترتبط عملية استئصا...</td>\n",
+       "      <td>أمراض الغدد الصماء</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>اليوم حاسس ان عندى حاجه فى الدبر من جوا مش عاي...</td>\n",
+       "      <td>يغلب ان تعكس الحالة بواسير شرجية داخلية من الد...</td>\n",
+       "      <td>جراحة عامة</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>ليه فجأة بحس انى مش عارفة اتنفس وجسمى بينمل وي...</td>\n",
+       "      <td>من المحتمل عضوي او تاثير جانبي من اي ادويه بيت...</td>\n",
+       "      <td>أمراض نفسية</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                            Question  \\\n",
+       "0  اجريت صورة رنين مغناطيسي للثدي ظهر منطقة تعزيز...   \n",
+       "1  انا اعاني من اشياء تجبرني على فعل امور لا اريد...   \n",
+       "2  أريد الاستفسار عن مضاعفات عملية استئصال ورم ال...   \n",
+       "3  اليوم حاسس ان عندى حاجه فى الدبر من جوا مش عاي...   \n",
+       "4  ليه فجأة بحس انى مش عارفة اتنفس وجسمى بينمل وي...   \n",
+       "\n",
+       "                                              Answer            Category  \n",
+       "0  المهم بالموضوع ما هي درجة ال BIRADS الموصوفة ل...          جراحة عامة  \n",
+       "1  الف سلامه عليك ، انت في حاجه الي معالج نفسي لم...         أمراض نفسية  \n",
+       "2  كغيرها من العمليات الجراحية ترتبط عملية استئصا...  أمراض الغدد الصماء  \n",
+       "3  يغلب ان تعكس الحالة بواسير شرجية داخلية من الد...          جراحة عامة  \n",
+       "4  من المحتمل عضوي او تاثير جانبي من اي ادويه بيت...         أمراض نفسية  "
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6e53e630",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006526,
+     "end_time": "2025-07-04T22:20:06.711546",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.705020",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## ****Dataset Describtion****"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "acaabe78",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:06.726926Z",
+     "iopub.status.busy": "2025-07-04T22:20:06.726389Z",
+     "iopub.status.idle": "2025-07-04T22:20:06.822518Z",
+     "shell.execute_reply": "2025-07-04T22:20:06.820957Z"
+    },
+    "papermill": {
+     "duration": 0.107601,
+     "end_time": "2025-07-04T22:20:06.825929",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.718328",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   No | Category                         |   Size |   Percentage |\n",
+      "+======+==================================+========+==============+\n",
+      "|    1 | أمراض نسائية                     | 162142 |        20.06 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    2 | الصحة الجنسية                    |  96398 |        11.92 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    3 | أمراض العضلات والعظام و المفاصل  |  45826 |         5.67 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    4 | أمراض المسالك البولية والتناسلية |  42599 |         5.27 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    5 | الأمراض الجلدية                  |  41760 |         5.17 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    6 | الطب العام                       |  41740 |         5.16 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    7 | أمراض الجهاز الهضمي              |  36554 |         4.52 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    8 | أمراض الأطفال                    |  23818 |         2.95 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|    9 | الأمراض الجنسية                  |  22165 |         2.74 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   10 | أمراض القلب و الشرايين           |  22013 |         2.72 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   11 | أمراض نفسية                      |  19091 |         2.36 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   12 | الحمل والولادة                   |  18763 |         2.32 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   13 | امراض العيون                     |  18682 |         2.31 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   14 | أنف، أذن وحنجرة                  |  18674 |         2.31 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   15 | أمراض باطنية                     |  18123 |         2.24 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   16 | جراحة عامة                       |  17348 |         2.15 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   17 | أمراض الأسنان                    |  16901 |         2.09 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   18 | تغذية                            |  16344 |         2.02 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   19 | علم الصيدلة                      |  14890 |         1.84 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   20 | الأورام الخبيثة والحميدة         |  12361 |         1.53 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   21 | الأمراض العصبية                  |  10845 |         1.34 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   22 | الصحة النفسية                    |  10349 |         1.28 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   23 | أمراض الغدد الصماء               |   9237 |         1.14 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   24 | صحة الطفل                        |   8270 |         1.02 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   25 | مرض السكري                       |   7147 |         0.88 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   26 | البشرة والجمال                   |   6656 |         0.82 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   27 | أمراض الجهاز التنفسي             |   6102 |         0.75 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   28 | ارتفاع ضغط الدم                  |   4557 |         0.56 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   29 | أمراض الفم                       |   4411 |         0.55 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   30 | جراحة العظام                     |   4194 |         0.52 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   31 | صحة الأسنان                      |   3967 |         0.49 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   32 | صحة الرجل                        |   3806 |         0.47 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   33 | صحة المرأة                       |   3608 |         0.45 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   34 | أمراض الدم                       |   2362 |         0.29 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   35 | صحة عامة                         |   2307 |         0.29 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   36 | طب الأسنان                       |   2232 |         0.28 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   37 | إدمان                            |   1915 |         0.24 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   38 | جراحة تجميل                      |   1579 |         0.2  |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   39 | الصحة و الرياضة                  |   1114 |         0.14 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   40 | جراحة الفك والأسنان              |    685 |         0.08 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   41 | جراحة الأعصاب                    |    593 |         0.07 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   42 | جراحة القلب والشرايين            |    575 |         0.07 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   43 | أرجية حساسية                     |    555 |         0.07 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   44 | علاج طبيعي                       |    418 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   45 | الامراض المعدية                  |    403 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   46 | أعشاب طبية                       |    402 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   47 | جراحة المسالك البولية            |    392 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   48 | الطب البديل                      |    387 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   49 | العقم                            |    386 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   50 | علم النفس                        |    382 |         0.05 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   51 | جراحة نسائية                     |    260 |         0.03 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   52 | تشخيص                            |    256 |         0.03 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   53 | هرمونات                          |    240 |         0.03 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   54 | مختبر                            |    224 |         0.03 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   55 | الامراض الوراثية                 |    166 |         0.02 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   56 | فيتامينات و معادن                |    150 |         0.02 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   57 | علم المناعة                      |     92 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   58 | علم الأشعة                       |     83 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   59 | بصريات                           |     82 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   60 | خدمات طبية                       |     77 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   61 | إسعاف أولي                       |     68 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   62 | علم الأجنة                       |     66 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   63 | علم التشريح                      |     61 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   64 | علم الأمراض                      |     57 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   65 | تخدير                            |     56 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   66 | علم السموم                       |     55 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   67 | علم الأحياء                      |     49 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   68 | علم الأحياء الدقيقة              |     48 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   69 | علم الوراثة                      |     44 |         0.01 |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   70 | فيزيولوجيا                       |     34 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   71 | الطب الوقائي                     |     34 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   72 | الأمراض الرثويه                  |     34 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   73 | مطاعيم و لقاحات                  |     32 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   74 | تشوهات خلقية                     |     21 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   75 | كيمياء                           |     18 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   76 | تاريخ الطب                       |     18 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   77 | صحة المسنين                      |     17 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   78 | جراحة الأطفال                    |     16 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   79 | رمضان                            |     13 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   80 | كيمياء حيوية                     |     12 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   81 | جراحة الأوعية الدموية            |     12 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   82 | حمل الأنابيب                     |     12 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   83 | تجهيزات طبية                     |      8 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   84 | فيزياء                           |      8 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   85 | أمراض الاستقلاب                  |      7 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   86 | علم النبات                       |      5 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   87 | علم الأنسجة                      |      5 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   88 | أخبار الطبي                      |      2 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   89 | كيمياء عضوية                     |      1 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n",
+      "|   90 | علم البيئة                       |      1 |         0    |\n",
+      "+------+----------------------------------+--------+--------------+\n"
+     ]
+    }
+   ],
+   "source": [
+    "import pandas as pd\n",
+    "from tabulate import tabulate\n",
+    "\n",
+    "# Group by Category and count\n",
+    "category_counts = df['Category'].value_counts().reset_index()\n",
+    "category_counts.columns = ['Category', 'Size']\n",
+    "\n",
+    "# Calculate percentage\n",
+    "total = category_counts['Size'].sum()\n",
+    "category_counts['Percentage'] = (category_counts['Size'] / total * 100).round(2)\n",
+    "\n",
+    "# Add index as No column\n",
+    "category_counts.insert(0, 'No', range(1, len(category_counts) + 1))\n",
+    "\n",
+    "# Print the table with lines\n",
+    "print(tabulate(category_counts , headers='keys', tablefmt='grid', showindex=False))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "30ae6741",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007382,
+     "end_time": "2025-07-04T22:20:06.841535",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.834153",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### AHD is considered one of the largest, available and variant Arabic datasets. It provides up to 90 categories with over 808k questions and answers, ensuring a strong foundation for precise text classification. The size of this dataset makes it an appropriate corpus for applying both classical and deep learning models. The dataset adopts the questions and answers with the same annotation as it appeared in the website. The average length of the questions and answers in the dataset is 115 and 152 respectively. It’s kept in a raw format with preprocessing or any type of cleaning."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "88b3a093",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006996,
+     "end_time": "2025-07-04T22:20:06.855768",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.848772",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## ****Data Preprocessing****"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "159e6af3",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00689,
+     "end_time": "2025-07-04T22:20:06.869876",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.862986",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### - remove any leading or trailing spaces\n",
+    "#### - remove tatweel\n",
+    "#### - remove diacritics\n",
+    "#### - remove any URL\n",
+    "#### - remove any character that is not an Arabic letter or whitespace\n",
+    "#### - applies text normalization"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "b67cff57",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:06.886043Z",
+     "iopub.status.busy": "2025-07-04T22:20:06.885587Z",
+     "iopub.status.idle": "2025-07-04T22:20:06.892512Z",
+     "shell.execute_reply": "2025-07-04T22:20:06.891125Z"
+    },
+    "papermill": {
+     "duration": 0.017767,
+     "end_time": "2025-07-04T22:20:06.894831",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.877064",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def preprocessing(text, remove_links=True, normalize_text=True):\n",
+    "    \n",
+    "    text = str(text).strip()                                                    # removes any leading or trailing spaces\n",
+    "    text = strip_tatweel(text)                                                  # removes tatweel\n",
+    "    text = strip_diacritics(text)                                               # removes diacritics\n",
+    "    if remove_links:                                                            \n",
+    "        text = re.sub(r'http[s]?://\\S+', '', text)                              # removes any URL\n",
+    "    text = re.sub(r'[^\\u0600-\\u06FF\\s]', '', text)                              # removes any character that is not an Arabic letter or whitespace\n",
+    "    if normalize_text:                                                          # applies text normalization\n",
+    "        text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ٱ', 'ا').replace('ة', 'ه').replace('?', '').replace('؟', '')\n",
+    "    return text"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "5bcc1349",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:06.911447Z",
+     "iopub.status.busy": "2025-07-04T22:20:06.911047Z",
+     "iopub.status.idle": "2025-07-04T22:20:32.061271Z",
+     "shell.execute_reply": "2025-07-04T22:20:32.059846Z"
+    },
+    "papermill": {
+     "duration": 25.161173,
+     "end_time": "2025-07-04T22:20:32.063523",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:06.902350",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Apply preprocessing\n",
+    "df.loc[:, 'Question'] = df['Question'].apply(preprocessing)\n",
+    "df.loc[:, 'Answer'] = df['Answer'].apply(preprocessing)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "c79e46ea",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:32.080576Z",
+     "iopub.status.busy": "2025-07-04T22:20:32.080062Z",
+     "iopub.status.idle": "2025-07-04T22:20:32.953134Z",
+     "shell.execute_reply": "2025-07-04T22:20:32.951837Z"
+    },
+    "papermill": {
+     "duration": 0.884504,
+     "end_time": "2025-07-04T22:20:32.955302",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:32.070798",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def remove_links(text):\n",
+    "    if isinstance(text, str):\n",
+    "        return text.split('للمزيد')[0].strip()\n",
+    "    return text\n",
+    "\n",
+    "df['Answer'] = df['Answer'].apply(remove_links)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3db84f9d",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006627,
+     "end_time": "2025-07-04T22:20:32.969476",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:32.962849",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### The dataset is highly imbalanced, with a significant disparity in category sizes. This imbalance can pose challenges in machine learning tasks. Merging similar categories in the dataset can significantly improve balance and model performance by reducing fragmentation. \n",
+    "#### For instance, \"أمراض نسائية\" (Gynecological Diseases) now includes related topics such as \"أمراض الحمل والولادة\" (Pregnancy and Childbirth) and \"جراحة نسائية\" (Gynecological Surgery), ensuring that all aspects of women's health are treated as one category rather than separate, underrepresented ones."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "fcd11c88",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:32.985394Z",
+     "iopub.status.busy": "2025-07-04T22:20:32.984937Z",
+     "iopub.status.idle": "2025-07-04T22:20:33.176622Z",
+     "shell.execute_reply": "2025-07-04T22:20:33.175109Z"
+    },
+    "papermill": {
+     "duration": 0.202638,
+     "end_time": "2025-07-04T22:20:33.179106",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:32.976468",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Category\n",
+      "طبيب نساء وتوليد        184773\n",
+      "طبيب مسالك بولية        165360\n",
+      "طبيب باطني               62443\n",
+      "طبيب عظام                50438\n",
+      "طبيب جلدية               48416\n",
+      "طبيب جهاز هضمي           36554\n",
+      "طبيب أطفال               32154\n",
+      "طبيب نفسي                31737\n",
+      "طبيب أسنان               28196\n",
+      "طبيب قلب                 27145\n",
+      "طبيب عيون                18682\n",
+      "طبيب أنف وأذن وحنجرة     18674\n",
+      "طبيب جراح                17376\n",
+      "طبيب غدد صماء            16624\n",
+      "أخصائي تغذية             16494\n",
+      "علم الصيدلة              14890\n",
+      "طبيب أورام               12361\n",
+      "طبيب أعصاب               11438\n",
+      "طبيب صدرية                6505\n",
+      "طبيب أمراض دم             2362\n",
+      "طبيب تجميل                1579\n",
+      "الصحة و الرياضة           1114\n",
+      "أرجية حساسية               555\n",
+      "أعشاب طبية                 402\n",
+      "الطب البديل                387\n",
+      "العقم                      386\n",
+      "مختبر                      224\n",
+      "الامراض الوراثية           166\n",
+      "علم المناعة                 92\n",
+      "علم الأشعة                  83\n",
+      "بصريات                      82\n",
+      "خدمات طبية                  77\n",
+      "إسعاف أولي                  68\n",
+      "علم التشريح                 61\n",
+      "علم الأمراض                 57\n",
+      "تخدير                       56\n",
+      "علم السموم                  55\n",
+      "علم الأحياء                 49\n",
+      "علم الأحياء الدقيقة         48\n",
+      "علم الوراثة                 44\n",
+      "الطب الوقائي                34\n",
+      "فيزيولوجيا                  34\n",
+      "الأمراض الرثويه             34\n",
+      "مطاعيم و لقاحات             32\n",
+      "تشوهات خلقية                21\n",
+      "تاريخ الطب                  18\n",
+      "كيمياء                      18\n",
+      "رمضان                       13\n",
+      "حمل الأنابيب                12\n",
+      "كيمياء حيوية                12\n",
+      "فيزياء                       8\n",
+      "تجهيزات طبية                 8\n",
+      "أمراض الاستقلاب              7\n",
+      "علم النبات                   5\n",
+      "علم الأنسجة                  5\n",
+      "أخبار الطبي                  2\n",
+      "كيمياء عضوية                 1\n",
+      "علم البيئة                   1\n",
+      "Name: count, dtype: int64\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Define a dictionary for merging categories\n",
+    "category_mapping = {\n",
+    "    'أمراض نفسية': 'طبيب نفسي',\n",
+    "    'علم النفس': 'طبيب نفسي',\n",
+    "    'إدمان': 'طبيب نفسي',\n",
+    "\n",
+    "    'أمراض الغدد الصماء': 'طبيب غدد صماء',\n",
+    "    'مرض السكري': 'طبيب غدد صماء',\n",
+    "    'هرمونات': 'طبيب غدد صماء',\n",
+    "\n",
+    "    'أمراض نسائية': 'طبيب نساء وتوليد',\n",
+    "    'الحمل والولادة': 'طبيب نساء وتوليد',\n",
+    "    'جراحة نسائية': 'طبيب نساء وتوليد',\n",
+    "    'صحة المرأة': 'طبيب نساء وتوليد',\n",
+    "\n",
+    "    'أمراض الجهاز الهضمي': 'طبيب جهاز هضمي',\n",
+    "\n",
+    "    'أمراض القلب و الشرايين': 'طبيب قلب',\n",
+    "    'ارتفاع ضغط الدم': 'طبيب قلب',\n",
+    "    'جراحة القلب والشرايين': 'طبيب قلب',\n",
+    "\n",
+    "    'الطب العام': 'طبيب باطني',\n",
+    "    'صحة عامة': 'طبيب باطني',\n",
+    "    'تشخيص': 'طبيب باطني',\n",
+    "    'صحة المسنين': 'طبيب باطني',\n",
+    "    'أمراض باطنية': 'طبيب باطني',\n",
+    "\n",
+    "    'الأمراض الجلدية': 'طبيب جلدية',\n",
+    "    'البشرة والجمال': 'طبيب جلدية',\n",
+    "\n",
+    "    'أمراض العضلات والعظام و المفاصل': 'طبيب عظام',\n",
+    "    'جراحة العظام': 'طبيب عظام',\n",
+    "    'علاج طبيعي': 'طبيب عظام',\n",
+    "\n",
+    "    'أمراض الأطفال': 'طبيب أطفال',\n",
+    "    'صحة الطفل': 'طبيب أطفال',\n",
+    "    'علم الأجنة': 'طبيب أطفال',\n",
+    "\n",
+    "    'أمراض الدم': 'طبيب أمراض دم',\n",
+    "\n",
+    "    'امراض العيون': 'طبيب عيون',\n",
+    "\n",
+    "    'تغذية': 'أخصائي تغذية',\n",
+    "    'فيتامينات و معادن': 'أخصائي تغذية',\n",
+    "\n",
+    "    'الصحة الجنسية': 'طبيب مسالك بولية',\n",
+    "    'الأمراض الجنسية': 'طبيب مسالك بولية',\n",
+    "    'صحة الرجل': 'طبيب مسالك بولية',\n",
+    "    'أمراض المسالك البولية والتناسلية': 'طبيب مسالك بولية',\n",
+    "    'جراحة المسالك البولية': 'طبيب مسالك بولية',\n",
+    "\n",
+    "    'أنف، أذن وحنجرة': 'طبيب أنف وأذن وحنجرة',\n",
+    "\n",
+    "    'الأورام الخبيثة والحميدة': 'طبيب أورام',\n",
+    "\n",
+    "    'الأمراض العصبية': 'طبيب أعصاب',\n",
+    "    'جراحة الأعصاب': 'طبيب أعصاب',\n",
+    "\n",
+    "    'جراحة عامة': 'طبيب جراح',\n",
+    "    'جراحة تجميل': 'طبيب تجميل',\n",
+    "    'جراحة الأطفال': 'طبيب جراح',\n",
+    "    'جراحة الأوعية الدموية': 'طبيب جراح',\n",
+    "\n",
+    "    'أمراض الأسنان': 'طبيب أسنان',\n",
+    "    'صحة الأسنان': 'طبيب أسنان',\n",
+    "    'طب الأسنان': 'طبيب أسنان',\n",
+    "    'جراحة الفك والأسنان': 'طبيب أسنان',\n",
+    "    'أمراض الفم': 'طبيب أسنان',\n",
+    "    \n",
+    "    'أمراض الجهاز التنفسي': 'طبيب صدرية',\n",
+    "    'الامراض المعدية': 'طبيب صدرية',\n",
+    "\n",
+    "    'الصحة النفسية': 'طبيب نفسي',\n",
+    "\n",
+    "\n",
+    "    \n",
+    "}\n",
+    "\n",
+    "# Apply the mapping to merge categories\n",
+    "df['Category'] = df['Category'].map(category_mapping).fillna(df['Category'])\n",
+    "\n",
+    "# Check the updated category distribution\n",
+    "print(df['Category'].value_counts())\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "e6e97e1d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:33.196238Z",
+     "iopub.status.busy": "2025-07-04T22:20:33.195752Z",
+     "iopub.status.idle": "2025-07-04T22:20:33.398123Z",
+     "shell.execute_reply": "2025-07-04T22:20:33.396618Z"
+    },
+    "papermill": {
+     "duration": 0.213581,
+     "end_time": "2025-07-04T22:20:33.400525",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:33.186944",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 640x480 with 1 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "from PIL import Image\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "img = Image.open('/kaggle/input/gpppic1/1.png')\n",
+    "\n",
+    "plt.imshow(img)\n",
+    "plt.axis('off')  # Hide axis\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "44b1ddb0",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007783,
+     "end_time": "2025-07-04T22:20:33.416471",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:33.408688",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### After merging the categories, some still have very few examples, especially those with less than 400 rows. Removing these small categories will help the model perform better. When a category has too little data, the model struggles to learn from it and might make random or incorrect predictions."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "806c26e5",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:33.435447Z",
+     "iopub.status.busy": "2025-07-04T22:20:33.434943Z",
+     "iopub.status.idle": "2025-07-04T22:20:33.694104Z",
+     "shell.execute_reply": "2025-07-04T22:20:33.692163Z"
+    },
+    "papermill": {
+     "duration": 0.271565,
+     "end_time": "2025-07-04T22:20:33.696552",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:33.424987",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Category\n",
+      "طبيب نساء وتوليد        184773\n",
+      "طبيب مسالك بولية        165360\n",
+      "طبيب باطني               62443\n",
+      "طبيب عظام                50438\n",
+      "طبيب جلدية               48416\n",
+      "طبيب جهاز هضمي           36554\n",
+      "طبيب أطفال               32154\n",
+      "طبيب نفسي                31737\n",
+      "طبيب أسنان               28196\n",
+      "طبيب قلب                 27145\n",
+      "طبيب عيون                18682\n",
+      "طبيب أنف وأذن وحنجرة     18674\n",
+      "طبيب جراح                17376\n",
+      "طبيب غدد صماء            16624\n",
+      "أخصائي تغذية             16494\n",
+      "طبيب أورام               12361\n",
+      "طبيب أعصاب               11438\n",
+      "طبيب صدرية                6505\n",
+      "طبيب أمراض دم             2362\n",
+      "طبيب تجميل                1579\n",
+      "Name: count, dtype: int64\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Categories to be removed\n",
+    "categories_to_remove = [\n",
+    "    'مختبر', 'علم الصيدلة', 'علم الأمراض', 'أعشاب طبية', 'الطب البديل', 'بصريات',\n",
+    "    'علم الأشعة', 'خدمات طبية', 'إسعاف أولي', 'علم التشريح', 'علم السموم', 'تاريخ الطب',\n",
+    "    'أرجية حساسية', 'الامراض الوراثية', 'الصحة و الرياضة', 'علم المناعة', 'تشوهات خلقية',\n",
+    "    'مطاعيم و لقاحات', 'كيمياء', 'العقم', 'الطب الوقائي', 'حمل الأنابيب', 'رمضان',\n",
+    "    'أمراض الاستقلاب', 'تخدير', 'أخبار الطبي', 'تجهيزات طبية', 'علم النبات',\n",
+    "    'كيمياء عضوية', 'علم الأحياء', 'علم الوراثة', 'علم البيئة', 'كيمياء حيوية',\n",
+    "    'علم الأحياء الدقيقة', 'علم الأنسجة', 'فيزيولوجيا', 'فيزياء' , 'الأمراض الرثويه'\n",
+    "]\n",
+    "\n",
+    "# Remove these categories from the dataframe\n",
+    "df = df[~df['Category'].isin(categories_to_remove)]\n",
+    "\n",
+    "# Check the updated category distribution\n",
+    "print(df['Category'].value_counts())\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8741e37d",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007554,
+     "end_time": "2025-07-04T22:20:33.712026",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:33.704472",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### Given the large size of the dataset, training a model on the entire corpus at once is computationally expensive and time-consuming. To address this, a subset was chosen that is more than 100k rows with answer lengths between 65-350 tokens, which results in better generalization, better performance for rare classes and higher generation.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "c35e97a8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:33.730559Z",
+     "iopub.status.busy": "2025-07-04T22:20:33.730082Z",
+     "iopub.status.idle": "2025-07-04T22:20:42.424055Z",
+     "shell.execute_reply": "2025-07-04T22:20:42.422159Z"
+    },
+    "papermill": {
+     "duration": 8.705986,
+     "end_time": "2025-07-04T22:20:42.426324",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:33.720338",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Creating subset 1...\n",
+      "Creating subset 2...\n",
+      "Creating subset 3...\n",
+      "Creating subset 4...\n",
+      "Creating subset 5...\n",
+      "Category\n",
+      "طبيب نساء وتوليد        7390\n",
+      "طبيب مسالك بولية        6614\n",
+      "طبيب باطني              2497\n",
+      "طبيب عظام               2017\n",
+      "طبيب جلدية              1936\n",
+      "طبيب جهاز هضمي          1462\n",
+      "طبيب أطفال              1286\n",
+      "طبيب نفسي               1269\n",
+      "طبيب أسنان              1127\n",
+      "طبيب قلب                1085\n",
+      "طبيب جراح               1000\n",
+      "طبيب أورام              1000\n",
+      "طبيب أنف وأذن وحنجرة    1000\n",
+      "طبيب صدرية              1000\n",
+      "طبيب أعصاب              1000\n",
+      "أخصائي تغذية            1000\n",
+      "طبيب عيون               1000\n",
+      "طبيب أمراض دم           1000\n",
+      "طبيب غدد صماء           1000\n",
+      "طبيب تجميل              1000\n",
+      "Name: count, dtype: int64\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Define sampling fraction\n",
+    "sampling_fraction = 0.04\n",
+    "num_splits = 5\n",
+    "\n",
+    "# To store all 5 subsets\n",
+    "subsets = []\n",
+    "\n",
+    "# For each split\n",
+    "for split in range(num_splits):\n",
+    "    print(f\"Creating subset {split + 1}...\")\n",
+    "    split_subset = pd.DataFrame()\n",
+    "    \n",
+    "    for category in df['Category'].unique():\n",
+    "        category_data = df[df['Category'] == category]\n",
+    "        \n",
+    "        # Sample size calculation\n",
+    "        sample_size = int(len(category_data) * sampling_fraction)\n",
+    "        if sample_size < 1000:\n",
+    "            sample_size = min(len(category_data), 1000)\n",
+    "        \n",
+    "        # Sample differently each time by changing the random seed\n",
+    "        sampled_data = category_data.sample(sample_size, random_state=42 + split)\n",
+    "        split_subset = pd.concat([split_subset, sampled_data])\n",
+    "    \n",
+    "    split_subset.reset_index(drop=True, inplace=True)\n",
+    "    subsets.append(split_subset)\n",
+    "\n",
+    "# Example: check distribution in the first subset\n",
+    "print(subsets[0]['Category'].value_counts())\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0b798ad4",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007799,
+     "end_time": "2025-07-04T22:20:42.443472",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:42.435673",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "#### Preprocessing the dataset for NLP tasks is crucial to enhance the model’s performance. Tokenization, the process of breaking text into smaller units such as words or subwords, plays a key role in structuring the text efficiently for machine learning models."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "e3208c18",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:42.461758Z",
+     "iopub.status.busy": "2025-07-04T22:20:42.461324Z",
+     "iopub.status.idle": "2025-07-04T22:20:42.466771Z",
+     "shell.execute_reply": "2025-07-04T22:20:42.465475Z"
+    },
+    "papermill": {
+     "duration": 0.016942,
+     "end_time": "2025-07-04T22:20:42.468517",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:42.451575",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def tokenize_text(text):\n",
+    "    # Tokenizing the Arabic text using NLTK (you can use another tokenizer if needed)\n",
+    "    return word_tokenize(text)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "0044236d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:20:42.486567Z",
+     "iopub.status.busy": "2025-07-04T22:20:42.486092Z",
+     "iopub.status.idle": "2025-07-04T22:21:42.891231Z",
+     "shell.execute_reply": "2025-07-04T22:21:42.889868Z"
+    },
+    "papermill": {
+     "duration": 60.416997,
+     "end_time": "2025-07-04T22:21:42.893577",
+     "exception": false,
+     "start_time": "2025-07-04T22:20:42.476580",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Apply tokenization to all subsets\n",
+    "for i in range(len(subsets)):\n",
+    "    subsets[i]['Tokenized_Question'] = subsets[i]['Question'].apply(tokenize_text)\n",
+    "    subsets[i]['Tokenized_Answer'] = subsets[i]['Answer'].apply(tokenize_text)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "a2d60927",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:42.912040Z",
+     "iopub.status.busy": "2025-07-04T22:21:42.911537Z",
+     "iopub.status.idle": "2025-07-04T22:21:44.063920Z",
+     "shell.execute_reply": "2025-07-04T22:21:44.062168Z"
+    },
+    "papermill": {
+     "duration": 1.16432,
+     "end_time": "2025-07-04T22:21:44.066458",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:42.902138",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Remove duplicates\n",
+    "for i in range(len(subsets)):\n",
+    "    subsets[i] = subsets[i].drop_duplicates(subset=['Question', 'Answer']).reset_index(drop=True)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "91ac2700",
+   "metadata": {
+    "papermill": {
+     "duration": 0.008336,
+     "end_time": "2025-07-04T22:21:44.083557",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:44.075221",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "1c3f8602",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:44.102741Z",
+     "iopub.status.busy": "2025-07-04T22:21:44.102300Z",
+     "iopub.status.idle": "2025-07-04T22:21:44.242623Z",
+     "shell.execute_reply": "2025-07-04T22:21:44.241251Z"
+    },
+    "papermill": {
+     "duration": 0.152786,
+     "end_time": "2025-07-04T22:21:44.245019",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:44.092233",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "max_tokens = 512  \n",
+    "\n",
+    "def handle_length(text, max_tokens):\n",
+    "    return text[:max_tokens] if len(text) > max_tokens else text\n",
+    "\n",
+    "for i in range(len(subsets)):  # or disjoint_subsets\n",
+    "    subsets[i]['Processed_Question'] = subsets[i]['Tokenized_Question'].apply(lambda x: handle_length(x, max_tokens))\n",
+    "    subsets[i]['Processed_Answer'] = subsets[i]['Tokenized_Answer'].apply(lambda x: handle_length(x, max_tokens))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "2a6f445b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:44.264066Z",
+     "iopub.status.busy": "2025-07-04T22:21:44.263610Z",
+     "iopub.status.idle": "2025-07-04T22:21:45.160898Z",
+     "shell.execute_reply": "2025-07-04T22:21:45.159655Z"
+    },
+    "papermill": {
+     "duration": 0.909312,
+     "end_time": "2025-07-04T22:21:45.163220",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:44.253908",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "for i in range(len(subsets)):  # or disjoint_subsets\n",
+    "    subsets[i]['Question_with_Category'] = \"[CATEGORY: \" + subsets[i]['Category'] + \"] \" + subsets[i]['Processed_Question'].apply(lambda x: ' '.join(x))\n",
+    "    subsets[i]['Answer_with_Category'] = \"[CATEGORY: \" + subsets[i]['Category'] + \"] \" + subsets[i]['Processed_Answer'].apply(lambda x: ' '.join(x))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "04dae785",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007871,
+     "end_time": "2025-07-04T22:21:45.179567",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:45.171696",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "####  Another essential preprocessing step is removing stop words, which are common words that do not contribute significantly to meaning, such as \"في\" (in) or \"من\" (from). Arabic stop words are particularly important to remove because they consume unnecessary token space, reducing model efficiency."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "d7b0813d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:45.198070Z",
+     "iopub.status.busy": "2025-07-04T22:21:45.197535Z",
+     "iopub.status.idle": "2025-07-04T22:21:50.432985Z",
+     "shell.execute_reply": "2025-07-04T22:21:50.431220Z"
+    },
+    "papermill": {
+     "duration": 5.247821,
+     "end_time": "2025-07-04T22:21:50.435483",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:45.187662",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Manually defined Arabic stopwords\n",
+    "arabic_stopwords = [\n",
+    "    \"في\", \"على\", \"من\", \"إلى\", \"أن\", \"أنها\", \"هو\", \"هي\", \"لا\", \"أنت\", \"أنا\", \n",
+    "    \"و\", \"أو\", \"لكن\", \"إلخ\", \"هذا\", \"تلك\", \"إن\", \"لقد\", \"كانت\", \"كون\", \"بين\"\n",
+    "]\n",
+    "\n",
+    "# Function to remove stopwords\n",
+    "def remove_stopwords(text):\n",
+    "    tokens = text.split()\n",
+    "    filtered_tokens = [word for word in tokens if word not in arabic_stopwords]\n",
+    "    return \" \".join(filtered_tokens)\n",
+    "\n",
+    "# Apply to all subsets\n",
+    "for i in range(len(subsets)):  # or disjoint_subsets\n",
+    "    subsets[i]['Cleaned_Question'] = subsets[i]['Question_with_Category'].apply(remove_stopwords)\n",
+    "    subsets[i]['Cleaned_Answer'] = subsets[i]['Answer_with_Category'].apply(remove_stopwords)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "671717a8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:50.455029Z",
+     "iopub.status.busy": "2025-07-04T22:21:50.454588Z",
+     "iopub.status.idle": "2025-07-04T22:21:50.869843Z",
+     "shell.execute_reply": "2025-07-04T22:21:50.868720Z"
+    },
+    "papermill": {
+     "duration": 0.427676,
+     "end_time": "2025-07-04T22:21:50.872305",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:50.444629",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "for i in range(len(subsets)):  # or disjoint_subsets\n",
+    "    subsets[i] = subsets[i].dropna(subset=['Cleaned_Question', 'Cleaned_Answer']).reset_index(drop=True)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "2f04fa6d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:50.891053Z",
+     "iopub.status.busy": "2025-07-04T22:21:50.890648Z",
+     "iopub.status.idle": "2025-07-04T22:21:50.914749Z",
+     "shell.execute_reply": "2025-07-04T22:21:50.912865Z"
+    },
+    "papermill": {
+     "duration": 0.036381,
+     "end_time": "2025-07-04T22:21:50.917349",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:50.880968",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Shape of the cleaned dataset: \n",
+      "                                            Question  \\\n",
+      "0  عملت عمليه الناسور العصعصي قبل سنه بالطريقه ال...   \n",
+      "1  ارجوكم ماهي اعراض سرطان الاثنى عشري اصبت بقرحه...   \n",
+      "2  سلام عليكم ظهر لي منء مده كتله صغيره مثل حبه ا...   \n",
+      "3  اختي ظهر لها انتفاخ في فتحه الشرج ولكنه  يسبب ...   \n",
+      "4  عملت عمليه افتاق اربي منذ سنه وشهرين  لقد عاود...   \n",
+      "\n",
+      "                                              Answer   Category  \\\n",
+      "0  حدوث نخزات بسيطه وارد الحدوث مكان العمليه، ينص...  طبيب جراح   \n",
+      "1  بعلم الطب كل شي واردلكنني لم اسمع بقرحه اثناعش...  طبيب جراح   \n",
+      "2  و عليكم السلام غالبا هذه الكتله سطحيه ولا علاق...  طبيب جراح   \n",
+      "3  دائما نؤكدعلى ضروره مراجعه طبيب الجراحه للكشف ...  طبيب جراح   \n",
+      "4  انصحك بالذهاب لطبيب الجراحه العامه للفحصومن ال...  طبيب جراح   \n",
+      "\n",
+      "                                  Tokenized_Question  \\\n",
+      "0  [عملت, عمليه, الناسور, العصعصي, قبل, سنه, بالط...   \n",
+      "1  [ارجوكم, ماهي, اعراض, سرطان, الاثنى, عشري, اصب...   \n",
+      "2  [سلام, عليكم, ظهر, لي, منء, مده, كتله, صغيره, ...   \n",
+      "3  [اختي, ظهر, لها, انتفاخ, في, فتحه, الشرج, ولكن...   \n",
+      "4  [عملت, عمليه, افتاق, اربي, منذ, سنه, وشهرين, ل...   \n",
+      "\n",
+      "                                    Tokenized_Answer  \\\n",
+      "0  [حدوث, نخزات, بسيطه, وارد, الحدوث, مكان, العمل...   \n",
+      "1  [بعلم, الطب, كل, شي, واردلكنني, لم, اسمع, بقرح...   \n",
+      "2  [و, عليكم, السلام, غالبا, هذه, الكتله, سطحيه, ...   \n",
+      "3  [دائما, نؤكدعلى, ضروره, مراجعه, طبيب, الجراحه,...   \n",
+      "4  [انصحك, بالذهاب, لطبيب, الجراحه, العامه, للفحص...   \n",
+      "\n",
+      "                                  Processed_Question  \\\n",
+      "0  [عملت, عمليه, الناسور, العصعصي, قبل, سنه, بالط...   \n",
+      "1  [ارجوكم, ماهي, اعراض, سرطان, الاثنى, عشري, اصب...   \n",
+      "2  [سلام, عليكم, ظهر, لي, منء, مده, كتله, صغيره, ...   \n",
+      "3  [اختي, ظهر, لها, انتفاخ, في, فتحه, الشرج, ولكن...   \n",
+      "4  [عملت, عمليه, افتاق, اربي, منذ, سنه, وشهرين, ل...   \n",
+      "\n",
+      "                                    Processed_Answer  \\\n",
+      "0  [حدوث, نخزات, بسيطه, وارد, الحدوث, مكان, العمل...   \n",
+      "1  [بعلم, الطب, كل, شي, واردلكنني, لم, اسمع, بقرح...   \n",
+      "2  [و, عليكم, السلام, غالبا, هذه, الكتله, سطحيه, ...   \n",
+      "3  [دائما, نؤكدعلى, ضروره, مراجعه, طبيب, الجراحه,...   \n",
+      "4  [انصحك, بالذهاب, لطبيب, الجراحه, العامه, للفحص...   \n",
+      "\n",
+      "                              Question_with_Category  \\\n",
+      "0  [CATEGORY: طبيب جراح] عملت عمليه الناسور العصع...   \n",
+      "1  [CATEGORY: طبيب جراح] ارجوكم ماهي اعراض سرطان ...   \n",
+      "2  [CATEGORY: طبيب جراح] سلام عليكم ظهر لي منء مد...   \n",
+      "3  [CATEGORY: طبيب جراح] اختي ظهر لها انتفاخ في ف...   \n",
+      "4  [CATEGORY: طبيب جراح] عملت عمليه افتاق اربي من...   \n",
+      "\n",
+      "                                Answer_with_Category  \\\n",
+      "0  [CATEGORY: طبيب جراح] حدوث نخزات بسيطه وارد ال...   \n",
+      "1  [CATEGORY: طبيب جراح] بعلم الطب كل شي واردلكنن...   \n",
+      "2  [CATEGORY: طبيب جراح] و عليكم السلام غالبا هذه...   \n",
+      "3  [CATEGORY: طبيب جراح] دائما نؤكدعلى ضروره مراج...   \n",
+      "4  [CATEGORY: طبيب جراح] انصحك بالذهاب لطبيب الجر...   \n",
+      "\n",
+      "                                    Cleaned_Question  \\\n",
+      "0  [CATEGORY: طبيب جراح] عملت عمليه الناسور العصع...   \n",
+      "1  [CATEGORY: طبيب جراح] ارجوكم ماهي اعراض سرطان ...   \n",
+      "2  [CATEGORY: طبيب جراح] سلام عليكم ظهر لي منء مد...   \n",
+      "3  [CATEGORY: طبيب جراح] اختي ظهر لها انتفاخ فتحه...   \n",
+      "4  [CATEGORY: طبيب جراح] عملت عمليه افتاق اربي من...   \n",
+      "\n",
+      "                                      Cleaned_Answer  \n",
+      "0  [CATEGORY: طبيب جراح] حدوث نخزات بسيطه وارد ال...  \n",
+      "1  [CATEGORY: طبيب جراح] بعلم الطب كل شي واردلكنن...  \n",
+      "2  [CATEGORY: طبيب جراح] عليكم السلام غالبا هذه ا...  \n",
+      "3  [CATEGORY: طبيب جراح] دائما نؤكدعلى ضروره مراج...  \n",
+      "4  [CATEGORY: طبيب جراح] انصحك بالذهاب لطبيب الجر...  \n",
+      "                                            Question  \\\n",
+      "0      ماهي الفحوصات التي تتخذ عند عمل عمليه التكميم   \n",
+      "1  هل يمكن الشفاء من حاله خثره باسوريه بحجم الزيت...   \n",
+      "2  اعاني من مشكله البواسير واستعمالت مرهم ولحضت ت...   \n",
+      "3  عندما قمت بوضع المرهم في الشرج للبواسير تحسست ...   \n",
+      "4  اعاني من اللم في المستقيم ياتي ويروح\\nوبحس ب ح...   \n",
+      "\n",
+      "                                              Answer   Category  \\\n",
+      "0  لايوجد اجابه واحده عن السؤال \\nكل مريض يحتاج ت...  طبيب جراح   \n",
+      "1  عاده تشفى لوحدها خلال ٥٧ ايام اخذ علاج زايلوكي...  طبيب جراح   \n",
+      "2  لابد من اجراء الجراحه ويفضل بالطريقه الحديثه ب...  طبيب جراح   \n",
+      "3   ممكن وجود بواسير خارحيه ،راجع طبيب الجراحه للفحص  طبيب جراح   \n",
+      "4               اعراض بواسير غالبا تحتاج للفحص الطبي  طبيب جراح   \n",
+      "\n",
+      "                                  Tokenized_Question  \\\n",
+      "0  [ماهي, الفحوصات, التي, تتخذ, عند, عمل, عمليه, ...   \n",
+      "1  [هل, يمكن, الشفاء, من, حاله, خثره, باسوريه, بح...   \n",
+      "2  [اعاني, من, مشكله, البواسير, واستعمالت, مرهم, ...   \n",
+      "3  [عندما, قمت, بوضع, المرهم, في, الشرج, للبواسير...   \n",
+      "4  [اعاني, من, اللم, في, المستقيم, ياتي, ويروح, و...   \n",
+      "\n",
+      "                                    Tokenized_Answer  \\\n",
+      "0  [لايوجد, اجابه, واحده, عن, السؤال, كل, مريض, ي...   \n",
+      "1  [عاده, تشفى, لوحدها, خلال, ٥٧, ايام, اخذ, علاج...   \n",
+      "2  [لابد, من, اجراء, الجراحه, ويفضل, بالطريقه, ال...   \n",
+      "3  [ممكن, وجود, بواسير, خارحيه, ،راجع, طبيب, الجر...   \n",
+      "4        [اعراض, بواسير, غالبا, تحتاج, للفحص, الطبي]   \n",
+      "\n",
+      "                                  Processed_Question  \\\n",
+      "0  [ماهي, الفحوصات, التي, تتخذ, عند, عمل, عمليه, ...   \n",
+      "1  [هل, يمكن, الشفاء, من, حاله, خثره, باسوريه, بح...   \n",
+      "2  [اعاني, من, مشكله, البواسير, واستعمالت, مرهم, ...   \n",
+      "3  [عندما, قمت, بوضع, المرهم, في, الشرج, للبواسير...   \n",
+      "4  [اعاني, من, اللم, في, المستقيم, ياتي, ويروح, و...   \n",
+      "\n",
+      "                                    Processed_Answer  \\\n",
+      "0  [لايوجد, اجابه, واحده, عن, السؤال, كل, مريض, ي...   \n",
+      "1  [عاده, تشفى, لوحدها, خلال, ٥٧, ايام, اخذ, علاج...   \n",
+      "2  [لابد, من, اجراء, الجراحه, ويفضل, بالطريقه, ال...   \n",
+      "3  [ممكن, وجود, بواسير, خارحيه, ،راجع, طبيب, الجر...   \n",
+      "4        [اعراض, بواسير, غالبا, تحتاج, للفحص, الطبي]   \n",
+      "\n",
+      "                              Question_with_Category  \\\n",
+      "0  [CATEGORY: طبيب جراح] ماهي الفحوصات التي تتخذ ...   \n",
+      "1  [CATEGORY: طبيب جراح] هل يمكن الشفاء من حاله خ...   \n",
+      "2  [CATEGORY: طبيب جراح] اعاني من مشكله البواسير ...   \n",
+      "3  [CATEGORY: طبيب جراح] عندما قمت بوضع المرهم في...   \n",
+      "4  [CATEGORY: طبيب جراح] اعاني من اللم في المستقي...   \n",
+      "\n",
+      "                                Answer_with_Category  \\\n",
+      "0  [CATEGORY: طبيب جراح] لايوجد اجابه واحده عن ال...   \n",
+      "1  [CATEGORY: طبيب جراح] عاده تشفى لوحدها خلال ٥٧...   \n",
+      "2  [CATEGORY: طبيب جراح] لابد من اجراء الجراحه وي...   \n",
+      "3  [CATEGORY: طبيب جراح] ممكن وجود بواسير خارحيه ...   \n",
+      "4  [CATEGORY: طبيب جراح] اعراض بواسير غالبا تحتاج...   \n",
+      "\n",
+      "                                    Cleaned_Question  \\\n",
+      "0  [CATEGORY: طبيب جراح] ماهي الفحوصات التي تتخذ ...   \n",
+      "1  [CATEGORY: طبيب جراح] هل يمكن الشفاء حاله خثره...   \n",
+      "2  [CATEGORY: طبيب جراح] اعاني مشكله البواسير واس...   \n",
+      "3  [CATEGORY: طبيب جراح] عندما قمت بوضع المرهم ال...   \n",
+      "4  [CATEGORY: طبيب جراح] اعاني اللم المستقيم ياتي...   \n",
+      "\n",
+      "                                      Cleaned_Answer  \n",
+      "0  [CATEGORY: طبيب جراح] لايوجد اجابه واحده عن ال...  \n",
+      "1  [CATEGORY: طبيب جراح] عاده تشفى لوحدها خلال ٥٧...  \n",
+      "2  [CATEGORY: طبيب جراح] لابد اجراء الجراحه ويفضل...  \n",
+      "3  [CATEGORY: طبيب جراح] ممكن وجود بواسير خارحيه ...  \n",
+      "4  [CATEGORY: طبيب جراح] اعراض بواسير غالبا تحتاج...  \n"
+     ]
+    }
+   ],
+   "source": [
+    "# Display the shape of the cleaned and processed dataset\n",
+    "print(f\"Shape of the cleaned dataset: \")\n",
+    "\n",
+    "# Optionally, you can view the first few rows\n",
+    "print(subsets[0].head())\n",
+    "print(subsets[1].head())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "e764b6da",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-07-04T22:21:50.938051Z",
+     "iopub.status.busy": "2025-07-04T22:21:50.937579Z",
+     "iopub.status.idle": "2025-07-04T22:22:06.752446Z",
+     "shell.execute_reply": "2025-07-04T22:22:06.750844Z"
+    },
+    "papermill": {
+     "duration": 15.827827,
+     "end_time": "2025-07-04T22:22:06.754850",
+     "exception": false,
+     "start_time": "2025-07-04T22:21:50.927023",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "✅ All subsets saved to: /kaggle/working/cleaned_subsets\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "\n",
+    "# Make sure the output directory exists\n",
+    "output_dir = \"/kaggle/working/cleaned_subsets\"\n",
+    "os.makedirs(output_dir, exist_ok=True)\n",
+    "\n",
+    "# Save each subset as a separate CSV\n",
+    "for i, subset in enumerate(subsets):  # or disjoint_subsets\n",
+    "    file_path = os.path.join(output_dir, f\"subset_{i+1}.csv\")\n",
+    "    subset.to_csv(file_path, index=False)\n",
+    "\n",
+    "print(\"✅ All subsets saved to:\", output_dir)\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "none",
+   "dataSources": [
+    {
+     "datasetId": 6309098,
+     "sourceId": 12229500,
+     "sourceType": "datasetVersion"
+    },
+    {
+     "datasetId": 7803319,
+     "sourceId": 12375667,
+     "sourceType": "datasetVersion"
+    }
+   ],
+   "dockerImageVersionId": 30839,
+   "isGpuEnabled": false,
+   "isInternetEnabled": false,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.12"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 235.747865,
+   "end_time": "2025-07-04T22:22:09.487402",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2025-07-04T22:18:13.739537",
+   "version": "2.6.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
