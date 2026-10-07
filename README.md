@@ -2,6 +2,8 @@
 
 > **A large-scale Arabic NLP preprocessing workflow for cleaning, normalizing, restructuring, and preparing medical question-answer data for machine learning applications.**
 
+> **Note:** This repository contains a cleaned-up, standalone version of the preprocessing notebook from the graduation project. Every number below comes from that notebook. The project report in `docs/` describes the full project, and some of its dataset figures (for example 726K rows after filtering, and nine classifier subsets of about 108K rows) differ from this version.
+
 ## Overview
 
 This project focuses on the preprocessing and preparation of a large Arabic medical question-answer dataset for downstream Natural Language Processing (NLP) and machine learning tasks.
@@ -20,6 +22,8 @@ The resulting data is structured into smaller, more manageable subsets suitable 
 | Original size          | 800K+ records                         |
 | Original categories    | 90                                    |
 | Final major categories | 20                                    |
+| Rows after filtering   | 789,311                               |
+| Sampled subsets        | 5, about 36.7K rows each              |
 | Language               | Arabic                                |
 | Task                   | Dataset preprocessing and preparation |
 | Sampling               | Category-aware sampling               |
@@ -39,7 +43,7 @@ The workflow includes:
 * Removal of diacritics and tatweel
 * URL and unwanted-character removal
 * Category consolidation
-* Rare-category filtering
+* Category filtering
 * Category-aware sampling
 * Tokenization
 * Duplicate removal
@@ -93,7 +97,7 @@ Raw Arabic Medical Dataset
     Category Consolidation
             │
             ▼
-     Rare Category Removal
+     Category Filtering
             │
             ▼
     Category-Aware Sampling
@@ -141,7 +145,7 @@ The workflow removes:
 
 ### Tokenization
 
-Processed questions and answers are tokenized using **NLTK's word tokenizer** before subsequent processing steps.
+Processed questions and answers are tokenized using **NLTK's word tokenizer** before subsequent processing steps. Each tokenized text is then cut to at most 512 words.
 
 ---
 
@@ -176,7 +180,9 @@ The original dataset is highly imbalanced.
 
 For example, the largest categories contain tens or hundreds of thousands of records, while several categories contain fewer than 100 examples.
 
-After category consolidation and filtering, the workflow retains **20 major categories** with substantially larger sample sizes.
+After category consolidation, 38 small or non-specialist categories (for example pharmacology, chemistry and biology) are removed. The workflow retains **20 major categories** and **789,311 rows**.
+
+The imbalance is reduced, not eliminated. After filtering, the largest category (طبيب نساء وتوليد, 184,773 rows) is about 117 times the size of the smallest (طبيب تجميل, 1,579 rows). Category-aware sampling brings this down to about 7:1 in the sampled subsets (7,390 versus 1,000 rows in subset 1).
 
 The resulting category distribution includes:
 
@@ -210,12 +216,12 @@ Because processing and training on the entire corpus can be computationally expe
 The sampling strategy:
 
 * samples independently within each category
-* uses a fixed sampling fraction
+* samples 4% of each category, with a minimum of 1,000 rows per category (or all rows if a category has fewer)
 * maintains representation from smaller retained categories
-* uses different random seeds for different subsets
+* uses a different random seed (42 to 46) for each subset
 * produces five processed subsets for experimentation
 
-This provides multiple manageable datasets while retaining representation across the selected categories.
+This provides multiple manageable datasets while retaining representation across the selected categories. Each subset has 36,683 rows before duplicate removal. The subsets are drawn independently from the same data, so they overlap.
 
 ---
 
@@ -236,7 +242,7 @@ Arabic text normalization
        ↓
 Category consolidation
        ↓
-Rare-category filtering
+Category filtering
        ↓
 Category-aware sampling
        ↓
@@ -267,6 +273,8 @@ Each subset contains processed question-answer data together with the associated
 
 The generated datasets are intentionally **not committed to this repository** because of their size.
 
+The notebook was run on Kaggle. It reads the dataset from `/kaggle/input/ahd-arabic-healthcare-dataset/AHD.xlsx` and writes the subsets to `/kaggle/working/cleaned_subsets`. Change these paths to run it elsewhere.
+
 ---
 
 
@@ -290,7 +298,7 @@ The generated datasets are intentionally **not committed to this repository** be
 
 A detailed project report is available in the [`docs/`](docs/) directory.
 
-The report contains broader documentation of the graduation project. This repository specifically focuses on the **Arabic medical dataset preprocessing component**.
+The report contains broader documentation of the graduation project. This repository specifically focuses on the **Arabic medical dataset preprocessing component**, as a cleaned-up version of the notebook. The dataset figures in the report (726K rows after filtering, nine classifier subsets of about 108K rows with up to 6,000 samples per category) differ from the figures above, which come from this notebook.
 
 ---
 
@@ -303,7 +311,7 @@ My primary responsibilities included:
 * Designing the Arabic text preprocessing workflow
 * Cleaning and normalizing the raw dataset
 * Handling category inconsistencies
-* Addressing severe class imbalance
+* Reducing class imbalance with category merging and category-aware sampling
 * Creating sampled datasets for experimentation
 * Tokenizing and structuring the text
 * Removing duplicate records
